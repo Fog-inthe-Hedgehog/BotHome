@@ -3,7 +3,7 @@ import os
 
 from dotenv import load_dotenv
 from aiogram import Bot, Dispatcher
-from aiogram.exceptions import TelegramError
+from aiogram.exceptions import TelegramAPIError
 from aiogram.types import Message
 
 from commands.handlers import register_handlers
@@ -26,7 +26,7 @@ async def main() -> None:
     print("Bot started. Waiting for messages...")
     try:
         await dp.start_polling(bot)
-    except TelegramError as error:
+    except TelegramAPIError as error:
         print(f"Telegram error: {error}")
     finally:
         await bot.session.close()
