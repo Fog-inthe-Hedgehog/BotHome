@@ -7,6 +7,7 @@ from aiogram.exceptions import TelegramAPIError
 from aiogram.types import Message
 
 from commands.handlers import register_handlers
+from utils.rss_parser import start_background_parser
 
 # Загружаем переменные из .env файла
 load_dotenv()  # ищет .env в текущей директории
@@ -22,6 +23,12 @@ async def main() -> None:
     bot = Bot(token=token)
     dp = Dispatcher()
     register_handlers(dp)
+
+    # Запускаем фоновый парсер RSS
+    await start_background_parser(
+        bot=bot,
+        chat_id=os.getenv("ADMIN_ID")        
+    )
 
     print("Bot started. Waiting for messages...")
     try:
