@@ -1,4 +1,7 @@
 .env
-**/__pycache__/
+.env.local
+.env.*.local
+.log
 __pycache__/
 poetry.lock
+.venv
