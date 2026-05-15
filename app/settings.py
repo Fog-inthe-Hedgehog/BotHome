@@ -5,6 +5,8 @@ from dataclasses import dataclass
 
 from dotenv import load_dotenv
 
+from app.mtproto_proxy import parse_mtproto_proxy
+
 load_dotenv()
 
 
@@ -17,6 +19,9 @@ def _env_bool(name: str, default: bool = False) -> bool:
 class Settings:
     debug: bool
     telegram_bot_token: str
+    telegram_proxy: str
+    api_id: int
+    api_hash: str
     admin_id: int
     rss_url: str
     check_interval_hours: int
@@ -42,6 +47,20 @@ def load_settings() -> Settings:
     except ValueError as exc:
         raise RuntimeError(
             f"ADMIN_ID must be an integer, got: {admin_id_raw!r}"
+        ) from exc
+
+    api_id_raw = os.getenv("TELEGRAM_API_ID", "").strip()
+    api_hash = os.getenv("TELEGRAM_API_HASH", "").strip()
+    if not api_id_raw or not api_hash:
+        raise RuntimeError(
+            "TELEGRAM_API_ID and TELEGRAM_API_HASH are required for MTProto. "
+            "Get them at https://my.telegram.org"
+        )
+    try:
+        api_id = int(api_id_raw)
+    except ValueError as exc:
+        raise RuntimeError(
+            f"TELEGRAM_API_ID must be an integer, got: {api_id_raw!r}"
         ) from exc
 
     rss_url = os.getenv("RSS_URL", "").strip()
@@ -70,9 +89,23 @@ def load_settings() -> Settings:
     if not rss_keywords:
         raise RuntimeError("RSS_KEYWORDS must contain at least one keyword")
 
+    telegram_proxy = os.getenv("TELEGRAM_PROXY", "").strip()
+    if not telegram_proxy:
+        raise RuntimeError(
+            "TELEGRAM_PROXY not found. "
+            "Example: tg://proxy?server=1.2.3.4&port=8443&secret=ee36e2e7275"
+        )
+    try:
+        parse_mtproto_proxy(telegram_proxy)
+    except ValueError as exc:
+        raise RuntimeError(str(exc)) from exc
+
     return Settings(
         debug=_env_bool("DEBUG"),
         telegram_bot_token=token,
+        telegram_proxy=telegram_proxy,
+        api_id=api_id,
+        api_hash=api_hash,
         admin_id=admin_id,
         rss_url=rss_url,
         check_interval_hours=check_interval_hours,
