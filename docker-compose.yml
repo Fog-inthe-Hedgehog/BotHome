@@ -7,6 +7,8 @@ services:
     container_name: bothome
     env_file:
       - .env
+    volumes:
+      - ./rss_keywords.txt:/app/rss_keywords.txt
     restart: unless-stopped
     command: ["python", "-m", "app.main"]
     working_dir: /app

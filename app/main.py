@@ -4,6 +4,7 @@ from aiogram import Bot, Dispatcher
 from aiogram.exceptions import TelegramAPIError
 
 from app.commands.common import register_handlers
+from app.keywords import KeywordsStore
 from app.logger import logger
 from app.services.rss_parser import RSSParserBot, start_background_parser
 from app.settings import settings
@@ -13,14 +14,17 @@ async def main() -> None:
     bot = Bot(token=settings.telegram_bot_token)
     dp = Dispatcher()
 
+    keywords_store = KeywordsStore()
     parser = RSSParserBot(
         bot=bot,
         chat_id=settings.admin_id,
         settings=settings,
+        keywords=keywords_store.load(),
     )
     register_handlers(
         dp,
         parser,
+        keywords_store=keywords_store,
         admin_id=settings.admin_id,
         check_interval_hours=settings.check_interval_hours,
     )

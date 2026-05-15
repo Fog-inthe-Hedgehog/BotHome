@@ -20,7 +20,6 @@ class Settings:
     admin_id: int
     rss_url: str
     check_interval_hours: int
-    rss_keywords: list[str]
 
 
 def load_settings() -> Settings:
@@ -61,22 +60,12 @@ def load_settings() -> Settings:
     if check_interval_hours < 1:
         raise RuntimeError("CHECK_INTERVAL_HOURS must be >= 1")
 
-    keywords_raw = os.getenv("RSS_KEYWORDS", "Октябрьский,Тульская")
-    rss_keywords = [
-        keyword.strip()
-        for keyword in keywords_raw.split(",")
-        if keyword.strip()
-    ]
-    if not rss_keywords:
-        raise RuntimeError("RSS_KEYWORDS must contain at least one keyword")
-
     return Settings(
         debug=_env_bool("DEBUG"),
         telegram_bot_token=token,
         admin_id=admin_id,
         rss_url=rss_url,
         check_interval_hours=check_interval_hours,
-        rss_keywords=rss_keywords,
     )
 
 

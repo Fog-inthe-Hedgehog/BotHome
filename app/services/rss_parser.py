@@ -20,14 +20,23 @@ class NewsItem:
 
 
 class RSSParserBot:
-    def __init__(self, bot: Bot, chat_id: int, settings: Settings) -> None:
+    def __init__(
+        self,
+        bot: Bot,
+        chat_id: int,
+        settings: Settings,
+        keywords: list[str],
+    ) -> None:
         self.bot = bot
         self.chat_id = chat_id
         self.settings = settings
-        self.keywords = [keyword.lower() for keyword in settings.rss_keywords]
+        self.set_keywords(keywords)
         self.check_interval = settings.check_interval_hours * 3600
         self.seen_links: set[str] = set()
         self.rss_url = settings.rss_url
+
+    def set_keywords(self, keywords: list[str]) -> None:
+        self.keywords = [keyword.lower() for keyword in keywords]
 
     async def warm_up(self) -> int:
         """Mark all current feed entries as seen without sending notifications."""
