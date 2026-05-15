@@ -12,7 +12,7 @@ WORKDIR /app
 RUN pip install --no-cache-dir poetry
 
 COPY pyproject.toml poetry.lock ./
-RUN poetry install --no-root --no-dev --no-interaction --no-ansi
+RUN poetry install --no-root --only main
 COPY . .
 
 CMD ["python", "app/main.py"]
