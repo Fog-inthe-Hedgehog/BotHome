@@ -6,8 +6,8 @@ from aiogram import Bot, Dispatcher
 from aiogram.exceptions import TelegramAPIError
 from aiogram.types import Message
 
-from commands.handlers import register_handlers
-from utils.rss_parser import start_background_parser
+from app.commands.common import register_handlers
+from app.services.rss_parser import start_background_parser
 
 # Загружаем переменные из .env файла
 load_dotenv()  # ищет .env в текущей директории

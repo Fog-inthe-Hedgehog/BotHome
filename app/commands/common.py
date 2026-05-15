@@ -2,7 +2,7 @@ from aiogram import Dispatcher
 from aiogram.filters.command import Command
 from aiogram.types import Message
 
-from utils.rss_parser import start_background_parser
+from app.services.rss_parser import start_background_parser
 
 def register_handlers(dp: Dispatcher) -> None:
     @dp.message(Command(commands=["start"]))

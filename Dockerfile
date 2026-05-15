@@ -9,14 +9,10 @@ ENV POETRY_CACHE_DIR="/var/cache/pypoetry"
 
 WORKDIR /app
 
-RUN apt-get update \
-    && apt-get install -y --no-install-recommends curl \
-    && pip install --no-cache-dir "poetry>=1.7.0,<2.0.0" \
-    && apt-get purge -y --auto-remove curl \
-    && rm -rf /var/lib/apt/lists/*
+RUN pip install --no-cache-dir poetry
 
-COPY pyproject.toml .
-COPY . .
+COPY pyproject.toml poetry.lock ./
 RUN poetry install --no-root --no-dev --no-interaction --no-ansi
+COPY . .
 
-CMD ["python", "main.py"]
+CMD ["python", "app/main.py"]
