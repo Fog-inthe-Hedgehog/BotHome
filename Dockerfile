@@ -3,6 +3,7 @@ FROM python:3.13.12-slim
 
 ENV PYTHONDONTWRITEBYTECODE=1
 ENV PYTHONUNBUFFERED=1
+ENV PYTHONPATH=/app
 ENV POETRY_VIRTUALENVS_CREATE=false
 ENV POETRY_NO_INTERACTION=1
 ENV POETRY_CACHE_DIR="/var/cache/pypoetry"
@@ -15,4 +16,4 @@ COPY pyproject.toml poetry.lock ./
 RUN poetry install --no-root --only main
 COPY . .
 
-CMD ["python", "app/main.py"]
+CMD ["python", "-m", "app.main"]

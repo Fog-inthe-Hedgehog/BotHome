@@ -1,5 +1,3 @@
-version: "3.9"
-
 services:
   bothome:
     image: bot-home:${TAG}
@@ -10,7 +8,7 @@ services:
     env_file:
       - .env
     restart: unless-stopped
-    command: ["python", "app/main.py"]
+    command: ["python", "-m", "app.main"]
     working_dir: /app
     networks:
       - bothome_net
