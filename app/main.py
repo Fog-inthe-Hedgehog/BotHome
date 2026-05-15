@@ -2,6 +2,7 @@ import asyncio
 
 from aiogram import Bot, Dispatcher
 from aiogram.exceptions import TelegramAPIError
+from aiogram.fsm.storage.memory import MemoryStorage
 
 from app.commands.common import register_handlers
 from app.keywords import KeywordsStore
@@ -12,7 +13,7 @@ from app.settings import settings
 
 async def main() -> None:
     bot = Bot(token=settings.telegram_bot_token)
-    dp = Dispatcher()
+    dp = Dispatcher(storage=MemoryStorage())
 
     keywords_store = KeywordsStore()
     parser = RSSParserBot(
