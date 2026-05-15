@@ -20,6 +20,13 @@ async def main() -> None:
             "Create a .env file with TELEGRAM_BOT_TOKEN=your_token"
         )
 
+    admin_id = os.getenv("ADMIN_ID")
+    if not admin_id:
+        raise RuntimeError(
+            "ADMIN_ID not found. "
+            "Create a .env file with ADMIN_ID=your_chat_id"
+        )
+
     bot = Bot(token=token)
     dp = Dispatcher()
     register_handlers(dp)
@@ -27,7 +34,7 @@ async def main() -> None:
     # Запускаем фоновый парсер RSS
     await start_background_parser(
         bot=bot,
-        chat_id=os.getenv("ADMIN_ID")        
+        chat_id=int(admin_id)
     )
 
     print("Bot started. Waiting for messages...")

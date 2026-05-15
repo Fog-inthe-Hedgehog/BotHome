@@ -1,21 +1,20 @@
 import asyncio
+import os
 import feedparser
 from datetime import datetime
 from aiogram import Bot
 from aiogram.exceptions import TelegramAPIError
 
 
+RSS_URL = os.getenv("RSS_URL")
+CHECK_INTERVAL_HOURS = int(os.getenv("CHECK_INTERVAL_HOURS", "24"))
+RSS_KEYWORDS = os.getenv(
+    "RSS_KEYWORDS",
+    "Октябрьский,Тульская"
+).split(",")
+
 # Ключевые слова для фильтрации новостей
-KEYWORDS = [
-    "Советская",
-    "Октябрьский", 
-    "Октябрьского",
-    "Вишневая",
-    "Техническая",
-    "Тульская"
-] 
-# Интервал проверки в часах
-CHECK_INTERVAL_HOURS = 24 
+KEYWORDS = [keyword.strip() for keyword in RSS_KEYWORDS if keyword.strip()]
 
 class RSSParserBot:
     def __init__(self, bot: Bot, chat_id: int):
@@ -25,7 +24,7 @@ class RSSParserBot:
         self.keywords = [kw.lower() for kw in KEYWORDS]
         self.check_interval = CHECK_INTERVAL_HOURS * 3600  # переводим в секунды
         self.seen_links = set()  # для хранения уже обработанных новостей
-        self.rss_url = "https://saratovvodokanal.ru/news/rss/"
+        self.rss_url = RSS_URL
 
     async def parse_rss(self):
         """Парсинг RSS-ленты и фильтрация новостей"""
