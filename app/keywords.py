@@ -1,5 +1,6 @@
 """Load and persist RSS filter keywords from a text file."""
 
+from collections.abc import Callable
 from pathlib import Path
 
 _PROJECT_ROOT = Path(__file__).resolve().parent.parent
@@ -10,6 +11,20 @@ DEFAULT_KEYWORDS_EXAMPLE = _PROJECT_ROOT / "data" / "rss_keywords.example.txt"
 class KeywordsStore:
     def __init__(self, path: Path | None = None) -> None:
         self.path = path or DEFAULT_KEYWORDS_PATH
+        self._on_change: Callable[[list[str]], None] | None = None
+
+    def set_on_change(self, callback: Callable[[list[str]], None] | None) -> None:
+        self._on_change = callback
+
+    def _notify_change(self, keywords: list[str]) -> None:
+        if self._on_change is not None:
+            self._on_change(keywords)
+
+    def reload(self) -> list[str]:
+        """Read keywords from disk and notify subscribers (e.g. RSS parser)."""
+        keywords = self.load()
+        self._notify_change(keywords)
+        return keywords
 
     def _ensure_keywords_file(self) -> None:
         if self.path.is_dir():
@@ -69,6 +84,7 @@ class KeywordsStore:
 
         keywords.append(word)
         self.save(keywords)
+        self._notify_change(keywords)
         return True, f"Добавлено: «{word}». Всего слов: {len(keywords)}."
 
     def delete(self, word: str) -> tuple[bool, str]:
@@ -90,4 +106,5 @@ class KeywordsStore:
 
         removed = keywords.pop(match_index)
         self.save(keywords)
+        self._notify_change(keywords)
         return True, f"Удалено: «{removed}». Осталось слов: {len(keywords)}."

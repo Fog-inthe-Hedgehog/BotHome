@@ -1,3 +1,5 @@
+import html
+
 from aiogram import Dispatcher, F
 from aiogram.filters.command import Command
 from aiogram.types import Message
@@ -37,6 +39,9 @@ def register_handlers(
             "/check_now — принудительная проверка RSS (только админ)\n"
             "/add_word &lt;слово&gt; — добавить ключевое слово (только админ)\n"
             "/delete_word &lt;слово&gt; — удалить ключевое слово (только админ)\n"
+            "/list_words — список ключевых слов (только админ)\n"
+            "/refresh — перезагрузить ключевые слова из файла "
+            "(после ручного редактирования, только админ)\n"
             "/help — показать эту справку\n\n"
             "<b>Автоматическая проверка:</b>\n"
             f"Бот автоматически проверяет новости раз в {check_interval_hours} ч.",
@@ -65,8 +70,6 @@ def register_handlers(
             return
 
         ok, reply = keywords_store.add(word)
-        if ok:
-            parser.set_keywords(keywords_store.load())
         await message.answer("✅ " + reply if ok else "⚠️ " + reply)
 
     @dp.message(Command("add_word"), F.from_user.id != admin_id)
@@ -84,10 +87,48 @@ def register_handlers(
             return
 
         ok, reply = keywords_store.delete(word)
-        if ok:
-            parser.set_keywords(keywords_store.load())
         await message.answer("✅ " + reply if ok else "⚠️ " + reply)
 
     @dp.message(Command("delete_word"), F.from_user.id != admin_id)
     async def cmd_delete_word_denied(message: Message) -> None:
+        await message.answer("⛔ Эта команда доступна только администратору.")
+
+    @dp.message(Command("list_words"), F.from_user.id == admin_id)
+    async def cmd_list_words(message: Message) -> None:
+        try:
+            keywords = keywords_store.load()
+        except RuntimeError as exc:
+            await message.answer(f"⚠️ {exc}")
+            return
+
+        if not keywords:
+            await message.answer("📝 Список ключевых слов пуст.")
+            return
+
+        lines = "\n".join(
+            f"{index}. {html.escape(word)}" for index, word in enumerate(keywords, 1)
+        )
+        await message.answer(
+            f"📝 <b>Ключевые слова ({len(keywords)}):</b>\n\n{lines}",
+            parse_mode="HTML",
+        )
+
+    @dp.message(Command("list_words"), F.from_user.id != admin_id)
+    async def cmd_list_words_denied(message: Message) -> None:
+        await message.answer("⛔ Эта команда доступна только администратору.")
+
+    @dp.message(Command("refresh"), F.from_user.id == admin_id)
+    async def cmd_refresh(message: Message) -> None:
+        try:
+            keywords = keywords_store.reload()
+        except RuntimeError as exc:
+            await message.answer(f"⚠️ {exc}")
+            return
+
+        await message.answer(
+            f"✅ Ключевые слова перезагружены из файла. Всего: {len(keywords)}"
+        )
+
+    @dp.message(Command("refresh"), F.from_user.id != admin_id)
+    async def cmd_refresh_denied(message: Message) -> None:
         await message.answer("⛔ Эта команда доступна только администратору.")

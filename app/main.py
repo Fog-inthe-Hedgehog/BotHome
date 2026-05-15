@@ -21,6 +21,7 @@ async def main() -> None:
         settings=settings,
         keywords=keywords_store.load(),
     )
+    keywords_store.set_on_change(parser.set_keywords)
     register_handlers(
         dp,
         parser,
