@@ -7,4 +7,4 @@ __pycache__/
 *.session
 *.session-journal
 *.tar
-rss_keywords.txt
+data/rss_keywords.txt

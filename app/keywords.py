@@ -3,19 +3,40 @@
 from pathlib import Path
 
 _PROJECT_ROOT = Path(__file__).resolve().parent.parent
-DEFAULT_KEYWORDS_PATH = _PROJECT_ROOT / "rss_keywords.txt"
+DEFAULT_KEYWORDS_PATH = _PROJECT_ROOT / "data" / "rss_keywords.txt"
+DEFAULT_KEYWORDS_EXAMPLE = _PROJECT_ROOT / "data" / "rss_keywords.example.txt"
 
 
 class KeywordsStore:
     def __init__(self, path: Path | None = None) -> None:
         self.path = path or DEFAULT_KEYWORDS_PATH
 
-    def load(self) -> list[str]:
-        if not self.path.exists():
+    def _ensure_keywords_file(self) -> None:
+        if self.path.is_dir():
             raise RuntimeError(
-                f"Keywords file not found: {self.path}. "
-                "Create rss_keywords.txt with one keyword per line."
+                f"{self.path} is a directory, not a file. "
+                "Remove it on the host and create data/rss_keywords.txt "
+                "(copy from data/rss_keywords.example.txt)."
             )
+
+        if self.path.exists():
+            return
+
+        self.path.parent.mkdir(parents=True, exist_ok=True)
+        if DEFAULT_KEYWORDS_EXAMPLE.exists():
+            self.path.write_text(
+                DEFAULT_KEYWORDS_EXAMPLE.read_text(encoding="utf-8"),
+                encoding="utf-8",
+            )
+            return
+
+        raise RuntimeError(
+            f"Keywords file not found: {self.path}. "
+            "Create data/rss_keywords.txt with one keyword per line."
+        )
+
+    def load(self) -> list[str]:
+        self._ensure_keywords_file()
 
         keywords: list[str] = []
         for line in self.path.read_text(encoding="utf-8").splitlines():
@@ -31,7 +52,7 @@ class KeywordsStore:
         return keywords
 
     def save(self, keywords: list[str]) -> None:
-        self.path.parent.mkdir(parents=True, exist_ok=True)
+        self._ensure_keywords_file()
         self.path.write_text(
             "\n".join(keywords) + "\n",
             encoding="utf-8",

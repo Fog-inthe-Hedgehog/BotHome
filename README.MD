@@ -7,7 +7,7 @@ Telegram-бот на **aiogram 3**, который периодически чи
 - Фоновая проверка RSS по расписанию (`CHECK_INTERVAL_HOURS`)
 - Фильтрация по ключевым словам в заголовке и описании
 - Команды: `/start`, `/help`, `/check_now` (ручная проверка, только для admin)
-- Управление ключевыми словами: файл `rss_keywords.txt`, команды `/add_word` и `/delete_word` (только admin)
+- Управление ключевыми словами: `data/rss_keywords.txt`, команды `/add_word` и `/delete_word` (только admin)
 - При первом запуске старые записи ленты не отправляются (warm-up)
 
 ## Требования
@@ -33,7 +33,9 @@ cp .env.example .env
 | `TAG` | Тег Docker-образа (для compose) |
 | `DEBUG` | Подробные логи (`true` / `false`) |
 
-Ключевые слова для фильтрации новостей хранятся в `rss_keywords.txt` (по одному слову на строку). Файл можно редактировать вручную или через команды бота `/add_word` и `/delete_word`.
+Ключевые слова для фильтрации новостей хранятся в `data/rss_keywords.txt` (по одному слову на строку). Шаблон: `data/rss_keywords.example.txt`. Файл можно редактировать вручную или через команды бота `/add_word` и `/delete_word`.
+
+При первом запуске в Docker, если `data/rss_keywords.txt` отсутствует, он создаётся из примера. Каталог `data/` монтируется в контейнер — не монтируйте отдельный файл, иначе Docker может создать каталог вместо файла.
 
 ## Локальный запуск
 
@@ -82,7 +84,7 @@ docker compose down
 app/
   main.py              # точка входа
   settings.py          # конфигурация из .env
-  keywords.py          # загрузка и сохранение rss_keywords.txt
+  keywords.py          # загрузка и сохранение data/rss_keywords.txt
   commands/common.py   # обработчики команд
   services/rss_parser.py
   logger.py

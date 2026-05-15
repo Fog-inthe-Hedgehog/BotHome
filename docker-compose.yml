@@ -8,7 +8,7 @@ services:
     env_file:
       - .env
     volumes:
-      - ./rss_keywords.txt:/app/rss_keywords.txt
+      - ./data:/app/data
     restart: unless-stopped
     command: ["python", "-m", "app.main"]
     working_dir: /app
