@@ -6,3 +6,4 @@ __pycache__/
 .venv
 *.session
 *.session-journal
+*.tar
