@@ -3,7 +3,6 @@
 .env.*.local
 .log
 __pycache__/
-poetry.lock
 .venv
 *.session
 *.session-journal

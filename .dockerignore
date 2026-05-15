@@ -11,3 +11,6 @@ __pycache__
 .env
 .idea
 .vscode
+*.tar
+*.session
+*.session-journal
