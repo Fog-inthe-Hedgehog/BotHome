@@ -83,12 +83,16 @@ def validate_mtproto_secret(secret: str) -> None:
         )
 
 
-def mtproxy_connection_class(secret: str, mode: str | None = None):
-    modes = {
+def _connection_modes() -> dict:
+    return {
         "abridged": connection.ConnectionTcpMTProxyAbridged,
         "intermediate": connection.ConnectionTcpMTProxyIntermediate,
         "randomized": connection.ConnectionTcpMTProxyRandomizedIntermediate,
     }
+
+
+def mtproxy_connection_candidates(secret: str, mode: str | None = None) -> list:
+    modes = _connection_modes()
 
     if mode:
         normalized_mode = mode.strip().lower()
@@ -97,14 +101,21 @@ def mtproxy_connection_class(secret: str, mode: str | None = None):
                 f"Unknown TELEGRAM_MTPROTO_MODE={mode!r}. "
                 f"Use: {', '.join(modes)}"
             )
-        return modes[normalized_mode]
+        return [modes[normalized_mode]]
 
-    # dd-secrets require randomized intermediate (Telethon requirement).
     if secret.startswith("dd"):
-        return connection.ConnectionTcpMTProxyRandomizedIntermediate
+        return [modes["randomized"]]
 
-    # ee-secrets (fake-TLS) usually work with intermediate, not randomized.
+    # ee-secrets (fake-TLS): intermediate first; randomized often fails.
     if secret.startswith("ee"):
-        return connection.ConnectionTcpMTProxyIntermediate
+        return [
+            modes["intermediate"],
+            modes["abridged"],
+            modes["randomized"],
+        ]
 
-    return connection.ConnectionTcpMTProxyIntermediate
+    return [
+        modes["intermediate"],
+        modes["abridged"],
+        modes["randomized"],
+    ]
