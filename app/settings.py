@@ -20,6 +20,7 @@ class Settings:
     debug: bool
     telegram_bot_token: str
     telegram_proxy: str
+    telegram_mtproto_mode: str | None
     api_id: int
     api_hash: str
     admin_id: int
@@ -100,10 +101,14 @@ def load_settings() -> Settings:
     except ValueError as exc:
         raise RuntimeError(str(exc)) from exc
 
+    mtproto_mode_raw = os.getenv("TELEGRAM_MTPROTO_MODE", "").strip()
+    telegram_mtproto_mode = mtproto_mode_raw or None
+
     return Settings(
         debug=_env_bool("DEBUG"),
         telegram_bot_token=token,
         telegram_proxy=telegram_proxy,
+        telegram_mtproto_mode=telegram_mtproto_mode,
         api_id=api_id,
         api_hash=api_hash,
         admin_id=admin_id,

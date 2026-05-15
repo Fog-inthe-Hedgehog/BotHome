@@ -7,13 +7,17 @@ from app.settings import Settings
 
 def create_client(settings: Settings) -> TelegramClient:
     proxy = parse_mtproto_proxy(settings.telegram_proxy)
-    connection_class = mtproxy_connection_class(proxy.secret)
+    connection_class = mtproxy_connection_class(
+        proxy.secret,
+        mode=settings.telegram_mtproto_mode,
+    )
 
     logger.info(
-        "Telegram client uses MTProto proxy {}:{} (secret prefix: {}...)",
+        "Telegram client uses MTProto proxy {}:{} (secret prefix: {}, mode: {})",
         proxy.server,
         proxy.port,
         proxy.secret[:4],
+        connection_class.__name__,
     )
 
     return TelegramClient(
