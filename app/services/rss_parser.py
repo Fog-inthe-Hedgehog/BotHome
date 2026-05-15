@@ -1,125 +1,148 @@
 import asyncio
-import os
+import html
+import re
+from dataclasses import dataclass
+
 import feedparser
-from datetime import datetime
 from aiogram import Bot
 from aiogram.exceptions import TelegramAPIError
 
+from app.logger import logger
+from app.settings import Settings
 
-RSS_URL = os.getenv("RSS_URL")
-CHECK_INTERVAL_HOURS = int(os.getenv("CHECK_INTERVAL_HOURS", "24"))
-RSS_KEYWORDS = os.getenv(
-    "RSS_KEYWORDS",
-    "Октябрьский,Тульская"
-).split(",")
 
-# Ключевые слова для фильтрации новостей
-KEYWORDS = [keyword.strip() for keyword in RSS_KEYWORDS if keyword.strip()]
+@dataclass
+class NewsItem:
+    title: str
+    link: str
+    description: str
+    pub_date: str
+
 
 class RSSParserBot:
-    def __init__(self, bot: Bot, chat_id: int):
-        
+    def __init__(self, bot: Bot, chat_id: int, settings: Settings) -> None:
         self.bot = bot
         self.chat_id = chat_id
-        self.keywords = [kw.lower() for kw in KEYWORDS]
-        self.check_interval = CHECK_INTERVAL_HOURS * 3600  # переводим в секунды
-        self.seen_links = set()  # для хранения уже обработанных новостей
-        self.rss_url = RSS_URL
+        self.settings = settings
+        self.keywords = [keyword.lower() for keyword in settings.rss_keywords]
+        self.check_interval = settings.check_interval_hours * 3600
+        self.seen_links: set[str] = set()
+        self.rss_url = settings.rss_url
 
-    async def parse_rss(self):
-        """Парсинг RSS-ленты и фильтрация новостей"""
+    async def warm_up(self) -> int:
+        """Mark all current feed entries as seen without sending notifications."""
+        feed = await self._fetch_feed()
+        marked = 0
+
+        for item in feed.entries:
+            link = item.get("link")
+            if not link or link in self.seen_links:
+                continue
+            self.seen_links.add(link)
+            marked += 1
+
+        logger.info("RSS warm-up completed: {} links marked as seen", marked)
+        return marked
+
+    async def _fetch_feed(self):
+        feed = await asyncio.to_thread(feedparser.parse, self.rss_url)
+
+        if feed.bozo:
+            logger.warning("RSS parse warning: {}", feed.bozo_exception)
+
+        if not getattr(feed, "entries", None):
+            logger.warning("RSS feed has no entries: {}", self.rss_url)
+
+        return feed
+
+    def _matches_keywords(self, item) -> bool:
+        title = item.get("title", "").lower()
+        description = self.clean_description(item.get("description", "")).lower()
+        text = f"{title} {description}"
+        return any(keyword in text for keyword in self.keywords)
+
+    async def parse_rss(self) -> list[NewsItem]:
         try:
-            # Парсим RSS ленту
-            feed = feedparser.parse(self.rss_url)
-            
-            if feed.bozo:  # если есть ошибки парсинга
-                print(f"Ошибка парсинга RSS: {feed.bozo_exception}")
-                return []
+            feed = await self._fetch_feed()
+            filtered_news: list[NewsItem] = []
 
-            filtered_news = []
             for item in feed.entries:
-                # Проверяем, не обрабатывали ли уже эту новость
-                if item.link in self.seen_links:
+                link = item.get("link")
+                if not link or link in self.seen_links:
                     continue
 
-                title = item.get('title', '').lower()
-                
-                # Проверяем наличие ключевых слов в заголовке
-                if any(keyword in title for keyword in self.keywords):
-                    filtered_news.append({
-                        'title': item.get('title', 'Без заголовка'),
-                        'link': item.get('link', '#'),
-                        'description': self.clean_description(item.get('description', '')),
-                        'pubDate': item.get('pubDate', '')
-                    })
-                    self.seen_links.add(item.link)
-            
+                if not self._matches_keywords(item):
+                    continue
+
+                filtered_news.append(
+                    NewsItem(
+                        title=item.get("title", "Без заголовка"),
+                        link=link,
+                        description=self.clean_description(
+                            item.get("description", "")
+                        ),
+                        pub_date=item.get("published", item.get("pubDate", "")),
+                    )
+                )
+                self.seen_links.add(link)
+
             return filtered_news
-            
-        except Exception as e:
-            print(f"Ошибка при парсинге RSS: {e}")
+
+        except Exception:
+            logger.exception("Failed to parse RSS feed")
             return []
 
-    def clean_description(self, description):
-        """Очистка HTML-тегов из описания"""
-        import re
-        # Удаляем HTML теги
-        clean = re.sub(r'<[^>]+>', '', description)
-        # Заменяем множественные пробелы на один
-        clean = re.sub(r'\s+', ' ', clean)
-        # Обрезаем слишком длинные описания
+    def clean_description(self, description: str) -> str:
+        clean = re.sub(r"<[^>]+>", "", description)
+        clean = re.sub(r"\s+", " ", clean)
         if len(clean) > 500:
             clean = clean[:497] + "..."
         return clean.strip()
 
-    async def send_news_notification(self, news_item):
-        """Отправка уведомления о новости пользователю"""
+    async def send_news_notification(self, news_item: NewsItem) -> None:
         message = (
-            f"🔔 <b>Новость по ключевому слову!</b>\n\n"
-            f"📌 <b>Заголовок:</b> {news_item['title']}\n\n"
-            f"📝 <b>Описание:</b>\n{news_item['description']}\n\n"
-            f"🔗 <b>Ссылка:</b> {news_item['link']}\n"
-            f"📅 <b>Дата публикации:</b> {news_item['pubDate']}"
+            "🔔 <b>Новость по ключевому слову!</b>\n\n"
+            f"📌 <b>Заголовок:</b> {html.escape(news_item.title)}\n\n"
+            f"📝 <b>Описание:</b>\n{html.escape(news_item.description)}\n\n"
+            f'🔗 <b>Ссылка:</b> <a href="{html.escape(news_item.link, quote=True)}">'
+            f"{html.escape(news_item.link)}</a>\n"
+            f"📅 <b>Дата публикации:</b> {html.escape(news_item.pub_date)}"
         )
-        
+
         try:
             await self.bot.send_message(
                 chat_id=self.chat_id,
                 text=message,
                 parse_mode="HTML",
-                disable_web_page_preview=False
+                disable_web_page_preview=False,
             )
-            print(f"Отправлено уведомление: {news_item['title']}")
-        except TelegramAPIError as e:
-            print(f"Ошибка отправки сообщения: {e}")
+            logger.info("Notification sent: {}", news_item.title)
+        except TelegramAPIError:
+            logger.exception("Failed to send notification")
 
-    async def run_background_task(self):
-        """Фоновая задача для периодической проверки RSS"""
-        print(f"Запущен фоновый парсер RSS. Проверка каждые {self.check_interval // 3600} часов")
-        
+    async def check_and_notify(self) -> int:
+        news_list = await self.parse_rss()
+
+        if not news_list:
+            logger.info("No new relevant news found")
+            return 0
+
+        logger.info("Found {} new relevant news items", len(news_list))
+        for news in news_list:
+            await self.send_news_notification(news)
+
+        return len(news_list)
+
+    async def run_background_task(self) -> None:
+        logger.info(
+            "Background RSS parser started (interval: {} h)",
+            self.settings.check_interval_hours,
+        )
+
         while True:
-            print(f"[{datetime.now()}] Проверка RSS-ленты...")
-            
-            news_list = await self.parse_rss()
-            
-            if news_list:
-                print(f"Найдено {len(news_list)} новых релевантных новостей")
-                for news in news_list:
-                    await self.send_news_notification(news)
-            else:
-                print("Новых релевантных новостей не найдено")
-            
-            # Ждем до следующей проверки
+            await self.check_and_notify()
             await asyncio.sleep(self.check_interval)
 
 
-# Функция для запуска фоновой задачи вместе с ботом
-async def start_background_parser(bot: Bot, chat_id: int):
-    """
-    Запускает фоновый парсер RSS
-    
-    bot: экземпляр Bot
-    chat_id: ID чата для уведомлений
-    """
-    parser = RSSParserBot(bot, chat_id)
-    asyncio.create_task(parser.run_background_task())
+def start_background_parser(parser: RSSParserBot) -> asyncio.Task[None]:
+    return asyncio.create_task(parser.run_background_task())

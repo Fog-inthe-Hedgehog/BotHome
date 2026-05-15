@@ -1,47 +1,38 @@
 import asyncio
-import os
 
-from dotenv import load_dotenv
 from aiogram import Bot, Dispatcher
 from aiogram.exceptions import TelegramAPIError
-from aiogram.types import Message
 
 from app.commands.common import register_handlers
-from app.services.rss_parser import start_background_parser
+from app.logger import logger
+from app.services.rss_parser import RSSParserBot, start_background_parser
+from app.settings import settings
 
-# Загружаем переменные из .env файла
-load_dotenv()  # ищет .env в текущей директории
 
 async def main() -> None:
-    token = os.getenv("TELEGRAM_BOT_TOKEN")
-    if not token:
-        raise RuntimeError(
-            "TELEGRAM_BOT_TOKEN not found. "
-            "Create a .env file with TELEGRAM_BOT_TOKEN=your_token"
-        )
-
-    admin_id = os.getenv("ADMIN_ID")
-    if not admin_id:
-        raise RuntimeError(
-            "ADMIN_ID not found. "
-            "Create a .env file with ADMIN_ID=your_chat_id"
-        )
-
-    bot = Bot(token=token)
+    bot = Bot(token=settings.telegram_bot_token)
     dp = Dispatcher()
-    register_handlers(dp)
 
-    # Запускаем фоновый парсер RSS
-    await start_background_parser(
+    parser = RSSParserBot(
         bot=bot,
-        chat_id=int(admin_id)
+        chat_id=settings.admin_id,
+        settings=settings,
+    )
+    register_handlers(
+        dp,
+        parser,
+        admin_id=settings.admin_id,
+        check_interval_hours=settings.check_interval_hours,
     )
 
-    print("Bot started. Waiting for messages...")
+    await parser.warm_up()
+    start_background_parser(parser)
+
+    logger.info("Bot started. Waiting for messages...")
     try:
         await dp.start_polling(bot)
-    except TelegramAPIError as error:
-        print(f"Telegram error: {error}")
+    except TelegramAPIError:
+        logger.exception("Telegram API error")
     finally:
         await bot.session.close()
 
