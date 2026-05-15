@@ -1,0 +1,19 @@
+version: "3.9"
+
+services:
+  bothome:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: bothome
+    env_file:
+      - .env
+    restart: unless-stopped
+    command: ["python", "main.py"]
+    working_dir: /app
+    networks:
+      - bothome_net
+
+networks:
+  bothome_net:
+    driver: bridge
