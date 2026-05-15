@@ -21,12 +21,11 @@ ADMIN_BUTTONS = frozenset(
 
 ALL_MENU_BUTTONS = ADMIN_BUTTONS | {BTN_START, BTN_HELP, BTN_CANCEL}
 
-
+#[KeyboardButton(text=BTN_START),
 def main_keyboard(is_admin: bool) -> ReplyKeyboardMarkup:
     if is_admin:
         rows = [
-            [KeyboardButton(text=BTN_START), KeyboardButton(text=BTN_HELP)],
-            [KeyboardButton(text=BTN_CHECK_NOW)],
+            [KeyboardButton(text=BTN_HELP),KeyboardButton(text=BTN_CHECK_NOW)],
             [KeyboardButton(text=BTN_LIST_WORDS), KeyboardButton(text=BTN_REFRESH)],
             [KeyboardButton(text=BTN_ADD_WORD), KeyboardButton(text=BTN_DELETE_WORD)],
         ]
