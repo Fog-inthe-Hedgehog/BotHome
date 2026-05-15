@@ -1,6 +1,7 @@
 import asyncio
 import html
 import re
+import urllib.request
 from dataclasses import dataclass
 
 import feedparser
@@ -64,24 +65,106 @@ class RSSParserBot:
 
         return feed
 
-    def _matches_keywords(self, item) -> bool:
+    def _entry_search_text(self, item) -> str:
         title = item.get("title", "").lower()
         description = self.clean_description(item.get("description", "")).lower()
-        text = f"{title} {description}"
-        return any(keyword in text for keyword in self.keywords)
+        return f"{title} {description}"
 
-    async def parse_rss(self) -> list[NewsItem]:
+    def _matching_keywords(self, item) -> list[str]:
+        text = self._entry_search_text(item)
+        return [keyword for keyword in self.keywords if keyword in text]
+
+    def _matches_keywords(self, item) -> bool:
+        return bool(self._matching_keywords(item))
+
+    async def _fetch_raw_rss(self) -> str:
+        def fetch() -> str:
+            with urllib.request.urlopen(self.rss_url, timeout=30) as response:
+                return response.read().decode("utf-8", errors="replace")
+
+        return await asyncio.to_thread(fetch)
+
+    async def _log_feed_debug(self, feed, *, ignore_seen: bool = False) -> None:
+        if not self.settings.debug:
+            return
+
+        logger.debug("RSS debug: url={}", self.rss_url)
+        logger.debug("RSS debug: active keywords={}", self.keywords)
+        logger.debug("RSS debug: seen links in memory={}", len(self.seen_links))
+        logger.debug("RSS debug: ignore_seen={}", ignore_seen)
+
+        try:
+            raw = await self._fetch_raw_rss()
+            preview = raw if len(raw) <= 12000 else raw[:12000] + "\n... [truncated]"
+            logger.debug(
+                "RSS debug: raw response ({} bytes):\n{}",
+                len(raw),
+                preview,
+            )
+        except Exception:
+            logger.exception("RSS debug: failed to fetch raw feed body")
+
+        entries = getattr(feed, "entries", None) or []
+        logger.debug("RSS debug: parsed entries={}", len(entries))
+
+        for index, item in enumerate(entries, start=1):
+            link = item.get("link", "")
+            title = item.get("title", "")
+            matched = self._matching_keywords(item)
+            seen = bool(link and link in self.seen_links)
+            description_preview = self.clean_description(item.get("description", ""))[:200]
+
+            logger.debug(
+                "RSS debug: entry {} title={!r} link={!r} seen={} "
+                "keywords={} description_preview={!r}",
+                index,
+                title,
+                link,
+                seen,
+                matched or "—",
+                description_preview,
+            )
+
+    async def parse_rss(self, *, ignore_seen: bool = False) -> list[NewsItem]:
         try:
             feed = await self._fetch_feed()
+            await self._log_feed_debug(feed, ignore_seen=ignore_seen)
             filtered_news: list[NewsItem] = []
 
             for item in feed.entries:
                 link = item.get("link")
-                if not link or link in self.seen_links:
+                if not link:
+                    if self.settings.debug:
+                        logger.debug(
+                            "RSS debug: skip entry without link: {!r}",
+                            item.get("title", ""),
+                        )
                     continue
 
-                if not self._matches_keywords(item):
+                if not ignore_seen and link in self.seen_links:
+                    if self.settings.debug:
+                        logger.debug("RSS debug: skip seen link: {}", link)
                     continue
+
+                if ignore_seen and link in self.seen_links and self.settings.debug:
+                    logger.debug("RSS debug: seen link ignored for check: {}", link)
+
+                if not self._matches_keywords(item):
+                    if self.settings.debug:
+                        logger.debug(
+                            "RSS debug: skip no keyword match: {} ({!r})",
+                            link,
+                            item.get("title", ""),
+                        )
+                    continue
+
+                if self.settings.debug:
+                    logger.debug(
+                        "RSS debug: matched new entry: {} keywords={} title={!r}",
+                        link,
+                        self._matching_keywords(item),
+                        item.get("title", ""),
+                    )
 
                 filtered_news.append(
                     NewsItem(
@@ -128,8 +211,8 @@ class RSSParserBot:
         except TelegramAPIError:
             logger.exception("Failed to send notification")
 
-    async def check_and_notify(self) -> int:
-        news_list = await self.parse_rss()
+    async def check_and_notify(self, *, ignore_seen: bool = False) -> int:
+        news_list = await self.parse_rss(ignore_seen=ignore_seen)
 
         if not news_list:
             logger.info("No new relevant news found")

@@ -5,7 +5,14 @@ from aiogram.filters.command import Command
 from aiogram.types import Message
 
 from app.keywords import KeywordsStore
+from app.logger import logger
 from app.services.rss_parser import RSSParserBot
+from app.settings import settings
+
+
+def _debug_log(message: str, *args: object) -> None:
+    if settings.debug:
+        logger.debug(message, *args)
 
 
 def _command_argument(message: Message) -> str | None:
@@ -36,7 +43,7 @@ def register_handlers(
         await message.answer(
             "📋 <b>Команды бота:</b>\n\n"
             "/start — запуск бота\n"
-            "/check_now — принудительная проверка RSS (только админ)\n"
+            "/check_now — проверка RSS без учёта уже просмотренных (только админ)\n"
             "/add_word &lt;слово&gt; — добавить ключевое слово (только админ)\n"
             "/delete_word &lt;слово&gt; — удалить ключевое слово (только админ)\n"
             "/list_words — список ключевых слов (только админ)\n"
@@ -50,8 +57,17 @@ def register_handlers(
 
     @dp.message(Command("check_now"), F.from_user.id == admin_id)
     async def cmd_check_now(message: Message) -> None:
+        _debug_log(
+            "Command /check_now from user_id={}",
+            message.from_user.id if message.from_user else None,
+        )
+        _debug_log("RSS URL: {}", parser.rss_url)
+        _debug_log("Parser keywords: {}", parser.keywords)
+        _debug_log("Seen links in memory: {}", len(parser.seen_links))
+
         await message.answer("🔄 Запущена ручная проверка RSS-ленты...")
-        count = await parser.check_and_notify()
+        count = await parser.check_and_notify(ignore_seen=True)
+        _debug_log("/check_now finished, notifications sent: {}", count)
 
         if count:
             await message.answer(f"✅ Отправлено уведомлений: {count}")
@@ -69,7 +85,10 @@ def register_handlers(
             await message.answer("Использование: /add_word &lt;слово&gt;", parse_mode="HTML")
             return
 
+        _debug_log("Command /add_word word={!r}", word)
         ok, reply = keywords_store.add(word)
+        if ok:
+            _debug_log("Keywords after /add_word: {}", parser.keywords)
         await message.answer("✅ " + reply if ok else "⚠️ " + reply)
 
     @dp.message(Command("add_word"), F.from_user.id != admin_id)
@@ -86,7 +105,10 @@ def register_handlers(
             )
             return
 
+        _debug_log("Command /delete_word word={!r}", word)
         ok, reply = keywords_store.delete(word)
+        if ok:
+            _debug_log("Keywords after /delete_word: {}", parser.keywords)
         await message.answer("✅ " + reply if ok else "⚠️ " + reply)
 
     @dp.message(Command("delete_word"), F.from_user.id != admin_id)
@@ -119,12 +141,14 @@ def register_handlers(
 
     @dp.message(Command("refresh"), F.from_user.id == admin_id)
     async def cmd_refresh(message: Message) -> None:
+        _debug_log("Command /refresh")
         try:
             keywords = keywords_store.reload()
         except RuntimeError as exc:
             await message.answer(f"⚠️ {exc}")
             return
 
+        _debug_log("Keywords after /refresh: {}", parser.keywords)
         await message.answer(
             f"✅ Ключевые слова перезагружены из файла. Всего: {len(keywords)}"
         )
