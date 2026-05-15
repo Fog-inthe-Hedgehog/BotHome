@@ -66,11 +66,20 @@ def normalize_mtproto_secret(secret: str) -> bytes:
 
 
 def validate_mtproto_secret(secret: str) -> None:
-    secret_bytes = normalize_mtproto_secret(secret)
-    if len(secret_bytes) != 16:
+    payload = secret[2:] if secret[:2] in ("ee", "dd") else secret
+
+    try:
+        decoded = bytes.fromhex(payload)
+    except ValueError as exc:
         raise ValueError(
-            "MTProto secret must decode to 16 bytes. "
-            "Check the secret from your tg://proxy link."
+            f"MTProto secret must be hex with even length "
+            f"(got {len(payload)} chars after prefix)."
+        ) from exc
+
+    if len(decoded) < 16:
+        raise ValueError(
+            f"MTProto secret decodes to {len(decoded)} bytes, need at least 16. "
+            "Copy the full secret from the tg://proxy link."
         )
 
 

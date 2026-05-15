@@ -13,9 +13,11 @@ def create_client(settings: Settings) -> TelegramClient:
     )
 
     logger.info(
-        "Telegram client uses MTProto proxy {}:{} (secret prefix: {}, mode: {})",
+        "Telegram client uses MTProto proxy {}:{} "
+        "(secret: {} chars, prefix: {}, mode: {})",
         proxy.server,
         proxy.port,
+        len(proxy.secret),
         proxy.secret[:4],
         connection_class.__name__,
     )
