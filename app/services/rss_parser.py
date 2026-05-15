@@ -4,8 +4,8 @@ import re
 from dataclasses import dataclass
 
 import feedparser
-from telethon import TelegramClient
-from telethon.errors import RPCError
+from aiogram import Bot
+from aiogram.exceptions import TelegramAPIError
 
 from app.logger import logger
 from app.settings import Settings
@@ -20,8 +20,8 @@ class NewsItem:
 
 
 class RSSParserBot:
-    def __init__(self, client: TelegramClient, chat_id: int, settings: Settings) -> None:
-        self.client = client
+    def __init__(self, bot: Bot, chat_id: int, settings: Settings) -> None:
+        self.bot = bot
         self.chat_id = chat_id
         self.settings = settings
         self.keywords = [keyword.lower() for keyword in settings.rss_keywords]
@@ -110,14 +110,13 @@ class RSSParserBot:
         )
 
         try:
-            await self.client.send_message(
-                self.chat_id,
-                message,
-                parse_mode="html",
-                link_preview=True,
+            await self.bot.send_message(
+                chat_id=self.chat_id,
+                text=message,
+                parse_mode="HTML",
             )
             logger.info("Notification sent: {}", news_item.title)
-        except RPCError:
+        except TelegramAPIError:
             logger.exception("Failed to send notification")
 
     async def check_and_notify(self) -> int:
